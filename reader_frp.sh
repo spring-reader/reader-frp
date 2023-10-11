@@ -13,11 +13,11 @@ S_C_PORT=51786
 S_C_SSH_PORT=51788
 TOKEN="da3538607a7c4344b07dd5940de87c0e"
 
-INI_SERVER="${WORK_DIR}/server.ini"
-INI_CLIENT="${WORK_DIR}/client.ini"
+INI_SERVER="${WORK_DIR}/c_server.toml"
+INI_CLIENT="${WORK_DIR}/c_client.toml"
 
 FRP_PID=
-FRP_STATIC_VERSION="0.52.0"
+FRP_STATIC_VERSION="0.52.3"
 
 # locale-gen en_US.UTF-8
 # export LC_ALL=en_US.UTF-8
@@ -62,34 +62,35 @@ adapt_frpc_ini() {
 	local file_ini=$1
 
 	if [[ -e $file_ini ]]; then
-		sed -i "/server_addr/c\server_addr = ${SERVER_ADDR}"  $file_ini
-		sed -i "/server_port/c\server_port = ${S_C_PORT}" $file_ini
+		sed -i "/serverAddr/c\serverAddr = \"${SERVER_ADDR}\""  $file_ini
+		sed -i "/serverPort /c\serverPort = ${S_C_PORT}" $file_ini
 
-		sed -i "/token/c\token = ${TOKEN}" $file_ini
+		sed -i "/auth.token/c\auth.token= \"${TOKEN}\"" $file_ini
 
-		sed -i "/remote_port/c\remote_port = ${S_C_SSH_PORT}" $file_ini
-		sed -i "/custom_domains/c\custom_domains = ${SERVER_DOMAIN}" $file_ini
+		sed -i "/remotePort/c\remotePort = ${S_C_SSH_PORT}" $file_ini
+		sed -i "/customDomains/c\customDomains = [\"${SERVER_DOMAIN}\"]" $file_ini
 	else
-		echo "[common]"  			> $file_ini
-		echo "server_addr = ${SERVER_ADDR}"  	>> $file_ini
-		echo "server_port = ${S_C_PORT}" 	>> $file_ini
-		echo "token = ${TOKEN}" 		>> $file_ini
+		echo "serverAddr = \"${SERVER_ADDR}\""  	> $file_ini
+		echo "serverPort = ${S_C_PORT}" 	>> $file_ini
+		echo 'loginFailExit = true' 		>> $file_ini
+		echo 'auth.method = "token"'		>> $file_ini
+		echo "auth.token = \"${TOKEN}\"" 	>> $file_ini
 		echo ""			 		>> $file_ini
 
-		echo "[ssh]"  			>> $file_ini
-		echo "type = tcp"		>> $file_ini
-		echo "local_ip = 127.0.0.1"	>> $file_ini
-		echo "local_port = 22"		>> $file_ini
-		echo "remote_port = ${S_C_SSH_PORT}" >> $file_ini
+		echo '[[proxies]]'  			>> $file_ini
+		echo 'name = "ssh"'		>> $file_ini
+		echo 'type = "tcp"'		>> $file_ini
+		echo 'localIP = "127.0.0.1"'	>> $file_ini
+		echo 'localPort = 22'		>> $file_ini
+		echo "remotePort = ${S_C_SSH_PORT}" >> $file_ini
 		echo ""			 		>> $file_ini
 
-		echo "[http_reader]"		>> $file_ini
-		echo "type = http"		>> $file_ini
-		echo "local_ip = 127.0.0.1"	>> $file_ini
-		echo "local_port = 8080"	>> $file_ini
-		echo "use_encryption = false"	>> $file_ini
-		echo "use_compression = true"	>> $file_ini
-		echo "custom_domains = \"${SERVER_DOMAIN}\""	>> $file_ini
+		echo '[[proxies]]'  			>> $file_ini
+		echo 'name = "http_reader"'		>> $file_ini
+		echo 'type = "http"'			>> $file_ini
+		echo 'localIP = "127.0.0.1"'		>> $file_ini
+		echo 'localPort = 8080'		>> $file_ini
+		echo "customDomains = [\"${SERVER_DOMAIN}\"]"	>> $file_ini
 	fi
 }
 
@@ -99,10 +100,11 @@ adapt_frps_ini() {
 	# sed -i "/bind_port/c\bind_port = ${S_C_PORT}" $file_ini
 	# sed -i '/vhost_http_port/c\vhost_http_port = ${SERVER_PORT}' $file_ini
 	# sed -i '/token/d' $file_ini
-	echo "[common]"  > $file_ini
-	echo "bind_port = ${S_C_PORT}"  >> $file_ini
-	echo "vhost_http_port = ${SERVER_PORT}" >> $file_ini
-	echo "token = ${TOKEN}" >> $file_ini
+	echo "bindPort = ${S_C_PORT}"  		> $file_ini
+	[[ -n "$FRP_HTTPS" ]] || echo "vhostHTTPPort = ${SERVER_PORT}" 	>> $file_ini
+	[[ -n "$FRP_HTTPS" ]] && echo "vhostHTTPSPort = ${SERVER_PORT}" >> $file_ini
+	echo 'auth.method = "token"'		>> $file_ini
+	echo "auth.token = \"${TOKEN}\"" 	>> $file_ini
 }
 
 frp_get_latest() {
@@ -129,6 +131,8 @@ frp_get_latest() {
 frp_get_static() {
 	local file_name=$(basename frp*${FRP_ARCH})
 	[[ "${file_name}" =~ "${FRP_STATIC_VERSION}" ]] && return 0
+
+	[[ -e $file_name ]] && rm -rf ${file_name}*
 
 	local static_ver="frp_${FRP_STATIC_VERSION}_${FRP_ARCH}.tar.gz"
 	wget https://github.com/fatedier/frp/releases/download/v${FRP_STATIC_VERSION}/$static_ver
@@ -174,7 +178,14 @@ run_frp() {
 	exit 255
 }
 
-get_domain_ip() {
+get_server_ip() {
+
+	[[ -z "$SERVER_DOMAIN" ]] && [[ -z "$SERVER_ADDR" ]] && exit 255
+
+	[[ -n "$SERVER_DOMAIN" ]] && [[ -z "$SERVER_ADDR" ]] && SERVER_ADDR=$SERVER_DOMAIN
+
+	return
+
 	if [[ -n "$SERVER_DOMAIN" ]] && [[ -z "$SERVER_ADDR" ]]; then
 		# SERVER_ADDR=$(ping -c 2 $SERVER_DOMAIN | head -2 | tail -1 | awk '{print $5}' | sed 's/[(:)]//g')
 		SERVER_ADDR=$(ping -c 1 $SERVER_DOMAIN | head -1 | awk '{print $3}' | sed 's/[(:)]//g')
@@ -216,6 +227,7 @@ while getopts ":scup:i:d:" opt; do #不打印错误信息, -a -c需要参数 -b 
 			;;
 		i)
 			SERVER_ADDR="$OPTARG"
+			SERVER_ADDR=$(echo $SERVER_ADDR | sed "s/\"//g")
 			;;
 		d)
 			SERVER_DOMAIN="$OPTARG"
@@ -236,7 +248,7 @@ if [[ -z $FRP_MODE ]]; then
 	exit -1
 fi
 
-[[ "$FRP_MODE" = "client" ]] && get_domain_ip
+[[ "$FRP_MODE" = "client" ]] && get_server_ip
 
 cd $WORK_DIR
 
