@@ -17,7 +17,7 @@ INI_SERVER="${WORK_DIR}/c_server.toml"
 INI_CLIENT="${WORK_DIR}/c_client.toml"
 
 FRP_PID=
-FRP_STATIC_VERSION="0.52.0"
+FRP_STATIC_VERSION="0.52.3"
 
 # locale-gen en_US.UTF-8
 # export LC_ALL=en_US.UTF-8
@@ -132,6 +132,8 @@ frp_get_static() {
 	local file_name=$(basename frp*${FRP_ARCH})
 	[[ "${file_name}" =~ "${FRP_STATIC_VERSION}" ]] && return
 
+	[[ -e $file_name ]] && rm -rf ${file_name}*
+
 	local static_ver="frp_${FRP_STATIC_VERSION}_${FRP_ARCH}.tar.gz"
 	wget https://github.com/fatedier/frp/releases/download/v${FRP_STATIC_VERSION}/$static_ver
 	[[ $? != 0 ]] && (rm -f $static_ver; exit 222)
@@ -140,7 +142,7 @@ frp_get_static() {
 
 frp_download() {
 	[[ -n $FRP_UPDATE ]] && frp_get_latest
-	[[ -e $(basename frp*${FRP_ARCH}) ]] || frp_get_static
+	frp_get_static
 	[[ -e $(basename frp*${FRP_ARCH}) ]] || exit 255
 }
 
