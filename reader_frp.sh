@@ -15,6 +15,7 @@ TOKEN="da3538607a7c4344b07dd5940de87c0e"
 
 INI_SERVER="${WORK_DIR}/c_server.toml"
 INI_CLIENT="${WORK_DIR}/c_client.toml"
+NODE_NAME=$(uname -n)
 
 
 source ${WORK_DIR}/proxy.sh
@@ -82,7 +83,7 @@ adapt_frpc_ini() {
 		echo ""			 		>> $file_ini
 
 		echo '[[proxies]]'  			>> $file_ini
-		echo 'name = "ssh"'		>> $file_ini
+		echo "name = \"${NODE_NAME}-ssh\""		>> $file_ini
 		echo 'type = "tcp"'		>> $file_ini
 		echo 'localIP = "127.0.0.1"'	>> $file_ini
 		echo 'localPort = 22'		>> $file_ini
@@ -90,7 +91,7 @@ adapt_frpc_ini() {
 		echo ""			 		>> $file_ini
 
 		echo '[[proxies]]'  			>> $file_ini
-		echo 'name = "http_reader"'		>> $file_ini
+		echo "name = \"${NODE_NAME}-http_reader\""		>> $file_ini
 		echo 'type = "http"'			>> $file_ini
 		echo 'localIP = "127.0.0.1"'		>> $file_ini
 		echo 'localPort = 8080'		>> $file_ini
@@ -187,9 +188,8 @@ get_server_ip() {
 
 	[[ -z "$SERVER_DOMAIN" ]] && [[ -z "$SERVER_ADDR" ]] && exit 255
 
-	[[ -n "$SERVER_DOMAIN" ]] && [[ -z "$SERVER_ADDR" ]] && SERVER_ADDR=$SERVER_DOMAIN
-
-	return
+	# [[ -n "$SERVER_DOMAIN" ]] && [[ -z "$SERVER_ADDR" ]] && SERVER_ADDR=$SERVER_DOMAIN
+	# return
 
 	if [[ -n "$SERVER_DOMAIN" ]] && [[ -z "$SERVER_ADDR" ]]; then
 		# SERVER_ADDR=$(ping -c 2 $SERVER_DOMAIN | head -2 | tail -1 | awk '{print $5}' | sed 's/[(:)]//g')
@@ -211,12 +211,13 @@ show_help() {
   echo '    -c                        Client mode'
   echo '    -i                        Server ip address, for client mode.'
   echo '    -d                        Server domain, for client mode.'
+  echo '    -r                        Ssh port for client.'
   echo '    -u                        Frp app update latest.'
   exit 0
 
 }
 
-while getopts ":scup:i:d:" opt; do #不打印错误信息, -a -c需要参数 -b 不需要传参
+while getopts ":scup:i:d:r:" opt; do
 	case $opt in
 		s)
 			FRP_MODE="server"
@@ -237,6 +238,9 @@ while getopts ":scup:i:d:" opt; do #不打印错误信息, -a -c需要参数 -b 
 		d)
 			SERVER_DOMAIN="$OPTARG"
 			SERVER_DOMAIN=$(echo $SERVER_DOMAIN | sed "s/\"//g")
+			;;
+		r)
+			S_C_SSH_PORT="$OPTARG"
 			;;
 		:)
 			echo "Option -$OPTARG requires an argument."
