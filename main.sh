@@ -6,6 +6,8 @@ TIMEOUT_DAYS=$((1 * 24 * 60 * 60))  # 1days
 MAIN_SELF=$$
 CLIENT_CONF="${WORK_DIR}/c_client.conf"
 
+source ${WORK_DIR}/proxy.sh
+
 trap 'kill $RESTART_SELF_PID $READER_PID' EXIT SIGKILL
 
 

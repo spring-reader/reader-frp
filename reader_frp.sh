@@ -16,6 +16,10 @@ TOKEN="da3538607a7c4344b07dd5940de87c0e"
 INI_SERVER="${WORK_DIR}/c_server.toml"
 INI_CLIENT="${WORK_DIR}/c_client.toml"
 
+
+source ${WORK_DIR}/proxy.sh
+setproxy
+
 FRP_PID=
 FRP_STATIC_VERSION="0.52.3"
 
@@ -68,7 +72,7 @@ adapt_frpc_ini() {
 		sed -i "/auth.token/c\auth.token= \"${TOKEN}\"" $file_ini
 
 		sed -i "/remotePort/c\remotePort = ${S_C_SSH_PORT}" $file_ini
-		sed -i "/customDomains/c\customDomains = [\"${SERVER_DOMAIN}\"]" $file_ini
+		sed -i "0,/customDomains.*$/s//customDomains = [\"${SERVER_DOMAIN}\"]/" $file_ini
 	else
 		echo "serverAddr = \"${SERVER_ADDR}\""  	> $file_ini
 		echo "serverPort = ${S_C_PORT}" 	>> $file_ini
@@ -171,6 +175,7 @@ run_frp() {
 		chmod +x $frp_app
 	fi
 
+	unsetproxy
 	$frp_app -c $file_ini &
 	FRP_PID=$!
 
