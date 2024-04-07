@@ -1,0 +1,16 @@
+source: 'https://github.com/spring-reader/reader-frp'
+nginx:
+  locations:
+    '-match': /
+  fastcgi: 'off'
+  root: public_html
+  index: 'index.php index.htm index.html'
+  ssl: 'off'
+  passenger:
+    enabled: 'on'
+    app_start_command: 'bash public_html/reader_frp.sh $PORT'
+features:
+  - java
+commands:
+  - 'sleep 1'
+
